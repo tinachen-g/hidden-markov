@@ -1,0 +1,13 @@
+Viterbi probability in log scale: -103.01
+----------------------------------------------
+
+Viterbi probability in log scale: -131.49
+----------------------------------------------
+
+Viterbi probability in log scale: -92.42
+----------------------------------------------
+
+Viterbi probability in log scale: -57.77
+----------------------------------------------
+
+Viterbi probability in log scale: -139.40
