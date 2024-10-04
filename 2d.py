@@ -47,7 +47,71 @@ def forward_backward(obs, trans_probs, emiss_probs, init_probs):
     ''' The same as your implementation from 2b.
         Copy other necessary helper functions you created for 2b to 2d.py.
     '''
-    pass
+    N = len(obs)                                       # Number of emissions (N)
+    K = len(init_probs)                                # Number of hidden states (K)
+    F = {state: np.full(N, None) for state in init_probs}   # Forward log-probabilities
+    B = {state: np.full(N, None) for state in init_probs}   # Backward log-probabilities
+    R = {state: np.full(N, None) for state in init_probs}   # Posterior probabilities (non-log scale)
+
+    # forward initialization
+    for state in init_probs:
+        F[state][0] = init_probs[state] + emiss_probs[state][obs[0]]
+    
+    # forward iteration
+    for t in range(1, N):
+        for state in init_probs:
+            x_t = obs[t]
+            # summation = 0
+            summation = -np.inf
+            for i in init_probs:
+                summation = sumLogProbs(summation, F[i][t-1] + trans_probs[i][state])
+                # summation = summation + F[i][t-1] + trans_probs[i][state]
+                # summation = sumLogProbs(summation, F[i][t-1] + trans_probs[i][state])
+            F[state][t] = summation + emiss_probs[state][x_t]
+
+    # like_f = 0
+    like_f = -np.inf
+    for state in init_probs:
+        # like_f = like_f + F[state][N-1]
+        like_f = sumLogProbs(like_f, F[state][N-1])
+
+    # bckward initializae
+    for state in init_probs:
+        # log(1) = 0
+        B[state][N-1] = 0
+
+    # backward iteration
+    for t in range(N-2, -1, -1):
+        for state in init_probs:
+            summation = -np.inf 
+            for i in init_probs:
+                summation = sumLogProbs(summation, B[i][t+1] + trans_probs[state][i] + emiss_probs[i][obs[t+1]])
+            B[state][t] = summation
+    
+    # like_b = 0
+    like_b = -np.inf
+    for state in init_probs:
+        # like_b = like_b + init_probs[state] + emiss_probs[state][obs[0]] + B[state][0]
+        like_b = sumLogProbs(like_b, init_probs[state] + emiss_probs[state][obs[0]] + B[state][0])
+
+
+    # posterior
+    assert np.isclose(like_f, like_b,)
+    assert np.isclose(math.e**like_f, math.e**like_b,)
+
+    for t in range(N):
+        local_estimate = -np.inf
+        for k in init_probs:
+            local_estimate = sumLogProbs(local_estimate, F[k][t] + B[k][t])
+        
+        local_estimate_exp= np.exp(local_estimate)
+        assert np.isclose(math.exp(like_b), local_estimate_exp)
+        assert np.isclose(math.exp(like_f), local_estimate_exp)
+
+        for k in init_probs:
+            R[k][t] = np.exp(F[k][t] + B[k][t] - local_estimate) 
+
+    return F, like_f, B, like_b, R
     
     
 ''' Computes the log-likelihood of the FASTA observation given mu
@@ -58,7 +122,23 @@ Returns:
 '''
 def log_likelihood(fasta_file, mu):
     ''' Complete this function. '''
-    pass
+    obs = read_fasta(fasta_file)
+
+    init_probs = {'h': np.log(0.5), 'l': np.log(0.5)}
+    
+    trans_probs = {
+        'h': {'h': np.log(1 - mu), 'l': np.log(mu)},
+        'l': {'h': np.log(mu), 'l': np.log(1 - mu)}
+    }
+
+    emiss_probs = {
+        'h': {'A': np.log(0.13), 'C': np.log(0.37), 'G': np.log(0.37), 'T': np.log(0.13)},
+        'l': {'A': np.log(0.32), 'C': np.log(0.18), 'G': np.log(0.18), 'T': np.log(0.32)}
+    }
+
+    _, like_f, _, _, _ = forward_backward(obs, trans_probs, emiss_probs, init_probs)
+    
+    return like_f
 
 
 def main():
